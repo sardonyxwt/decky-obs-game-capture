@@ -1,0 +1,11 @@
+{
+  "name": "OBS Game Capture",
+  "author": "Kyrylo",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": ["obs", "streaming", "twitch", "capture"],
+    "description": "One button installs OBS Studio with obs-vkcapture and sets it up for streaming; one toggle adds OBS_VKCAPTURE=1 to every game, new ones included.",
+    "image": "https://obsproject.com/assets/images/new_icon_small-r.png"
+  }
+}
