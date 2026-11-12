@@ -44,10 +44,20 @@ Then: start OBS from the library, start the game, and switch between them with t
 (DXVK / VKD3D) and native Vulkan games are captured; native OpenGL games are not (they would need obs-glcapture's
 `LD_PRELOAD`, which this plugin does not set).
 
+**Virtual microphone** (the toggle in the Audio section, off by default):
+
+- When no microphone is connected, WirePlumber makes the monitor of an output the default input and Steam's
+  Settings → Audio page fails with "An error occurred while rendering this content". The toggle adds a silent PipeWire
+  source, "virtual-microphone", that Steam then uses as its input device.
+- It is written to `~/.config/pipewire/pipewire.conf.d/90-obs-game-capture-virtual-mic.conf`, so it is back after
+  every reboot, and created right away with `pw-cli` (no PipeWire restart). Its session priority (1500) is above every
+  output and below real microphones: a connected microphone still becomes the default input.
+- Off removes the file and the source.
+
 ## Removing
 
 Turn the toggle off first, then uninstall the plugin in Decky: the layer manifests and the copied library are
-removed. OBS, its plugin and settings stay (uninstall them with `flatpak uninstall --user com.obsproject.Studio`).
+removed, and so is the virtual microphone. OBS, its plugin and settings stay (uninstall them with `flatpak uninstall --user com.obsproject.Studio`).
 A flag left in a game's launch options does nothing without the layer.
 
 ## Building

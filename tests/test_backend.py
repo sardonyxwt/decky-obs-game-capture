@@ -9,7 +9,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "py_modules"))
 
-from obscapture import artwork, flatpak, layer, obsconfig, system  # noqa: E402
+from obscapture import artwork, flatpak, layer, obsconfig, system, virtualmic  # noqa: E402
 
 
 def write(path, text):
@@ -167,6 +167,38 @@ def test_artwork_missing_kinds():
         assert artwork.missing_kinds(home, 123) == ["hero", "logo", "wide"]
         write(os.path.join(grid, "123.jpg"), "x")
         assert artwork.missing_kinds(home, 123) == ["hero", "logo"]
+
+
+def test_virtual_mic_config():
+    text = virtualmic.conf_text()
+    assert "factory.name = \"support.null-audio-sink\"" in text
+    assert "media.class = \"Audio/Source/Virtual\"" in text
+    assert "audio.position = [ \"FL\" \"FR\" ]" in text
+    assert f"priority.session = {virtualmic.PRIORITY}" in text
+    assert text.count("{") == text.count("}")
+    dump = [{"id": 5, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "virtual-microphone"}}},
+            {"id": 6, "type": "PipeWire:Interface:Node", "info": {"props": {"node.name": "alsa_input.x"}}},
+            {"id": 7, "type": "PipeWire:Interface:Port", "info": {"props": {"node.name": "virtual-microphone"}}},
+            {"id": 8, "type": "PipeWire:Interface:Node", "info": None}]
+    assert virtualmic.node_ids(dump) == [5]
+    with tempfile.TemporaryDirectory() as home:
+        bin_dir = os.path.join(home, "bin")
+        calls = os.path.join(home, "calls")
+        # fake PipeWire tools: pw-dump reports nothing, pw-cli records its arguments
+        write(os.path.join(bin_dir, "pw-dump"), "#!/bin/sh\necho '[]'\n")
+        write(os.path.join(bin_dir, "pw-cli"), f"#!/bin/sh\necho \"$@\" >> {calls}\n")
+        for tool in ("pw-dump", "pw-cli"):
+            os.chmod(os.path.join(bin_dir, tool), 0o755)
+        env = {**os.environ, "PATH": bin_dir + ":" + os.environ["PATH"]}
+        assert not virtualmic.configured(home)
+        virtualmic.enable(home, env)
+        assert virtualmic.configured(home)
+        assert open(virtualmic.conf_path(home)).read() == text
+        assert "create-node adapter" in open(calls).read() and "object.linger = true" in open(calls).read()
+        assert virtualmic.running(env) is False
+        virtualmic.disable(home, env)
+        assert not virtualmic.configured(home)
+        virtualmic.disable(home, env)  # twice is fine
 
 
 if __name__ == "__main__":

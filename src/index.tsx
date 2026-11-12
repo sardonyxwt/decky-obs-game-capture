@@ -2,7 +2,7 @@ import { ButtonItem, Field, PanelSection, PanelSectionRow, staticClasses, Toggle
 import { addEventListener, definePlugin, removeEventListener, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
 import { FaVideo } from "react-icons/fa";
-import { getArtwork, getState, saveGames, SetupState, SetupStep, startSetup, State } from "./backend";
+import { getArtwork, getState, saveGames, SetupState, SetupStep, setVirtualMic, startSetup, State } from "./backend";
 import { t, tr } from "./i18n";
 import {
   addFlag, ensureObsShortcut, findObsShortcut, forEachLimited, removeFlag, setArtwork, setShortcutIcon, targetApps,
@@ -26,7 +26,7 @@ const STEP_TEXT: Record<SetupStep | "steam", [string, string]> = {
 // ---------------- shared state ----------------
 let current: Ready | null = null;
 let obsAppid: number | null = null;
-let busy: "" | "setup" | "games" = "";
+let busy: "" | "setup" | "games" | "mic" = "";
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
@@ -241,6 +241,33 @@ function Content() {
               "Запусти OBS из библиотеки, потом игру: источник Game Capture покажет запущенную игру. Переключайся между ними кнопкой Steam.",
             )}
           </div>
+        </PanelSectionRow>
+      </PanelSection>
+
+      <PanelSection title={t("Audio", "Звук")}>
+        <PanelSectionRow>
+          <ToggleField
+            label={t("Virtual microphone", "Виртуальный микрофон")}
+            description={
+              s.virtual_mic && s.virtual_mic_running === false
+                ? t("Turned on, but PipeWire has not created it yet: restart the computer.",
+                    "Включён, но PipeWire его пока не создал: перезагрузи компьютер.")
+                : t(
+                    "A silent microphone for when none is connected: without one, Steam's Settings → Audio fails to open. A connected microphone still takes over.",
+                    "Пустой микрофон на случай, когда настоящего нет: без него не открываются Настройки → Звук в Steam. Подключённый микрофон всё равно главнее.",
+                  )
+            }
+            checked={s.virtual_mic}
+            disabled={busy !== ""}
+            onChange={async (on) => {
+              busy = "mic";
+              notify();
+              const r = await setVirtualMic(on);
+              if (!r.ok) toaster.toast({ title: t("Virtual microphone", "Виртуальный микрофон"), body: r.error });
+              busy = "";
+              await refresh();
+            }}
+          />
         </PanelSectionRow>
       </PanelSection>
     </>

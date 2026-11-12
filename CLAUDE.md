@@ -10,7 +10,7 @@ setup — one button installs OBS (flatpak) + obs-vkcapture + the Vulkan layer a
 
 ## Layout
 - `main.py` — Decky backend (`Plugin`): `get_state`, `start_setup` (background task, ends with the
-  `obs_setup_finished` event), `save_games` (records what the frontend did to launch options), `get_artwork`
+  `obs_setup_finished` event), `save_games` (records what the frontend did to launch options), `set_virtual_mic`, `get_artwork`
 - `py_modules/obscapture/` — logic without Decky (standard library only):
   - `flatpak.py` — flatpak CLI, always `--user`; `install` uses `--or-update`
   - `layer.py` — copies `libVkLayer_obs_vkcapture.so` (64 + 32 bit) from the flatpak extension to
@@ -22,6 +22,9 @@ setup — one button installs OBS (flatpak) + obs-vkcapture + the Vulkan layer a
     scene collection JSON (adds a `vkcapture-source` item on top). Names come from `user.ini` `[Basic]` (OBS 31+),
     else `global.ini`. Backups `*.obs-game-capture.bak` once
   - `system.py` — OBS running (`/proc/*/comm == obs`), render node (boot_vga first, Intel last), display size
+  - `virtualmic.py` — the "Virtual microphone" toggle: a silent `Audio/Source/Virtual` null sink (priority.session
+    1500: above outputs' monitors, below real mics) as a PipeWire drop-in in `~/.config/pipewire/pipewire.conf.d/` plus
+    a live node via `pw-cli create-node` (`object.linger`). Without any source Steam's Settings → Audio crashes
   - `artwork.py` — OBS's Steam store art (app 1905180) for kinds the shortcut has no grid image of
 - `src/` — frontend (React, @decky/ui, @decky/api)
   - `launchOptions.ts` — pure add/remove of the flag (at the start of the line: env assignments must precede the command)
@@ -46,5 +49,5 @@ O=$(mktemp -d) && npx tsc src/launchOptions.ts --outDir $O --module es2020 --tar
   disable), `layer_registered`. While enabled, every sweep checks every target and re-adds a missing flag.
 - Launch options are read only through `RegisterForAppDetails`: `appDetailsStore` keeps stale values for apps whose
   page is not open, and writing back from them drops the user's options.
-- `_uninstall` is also called on plugin updates: it removes the layer, and `_main` re-registers it when
-  `layer_registered` is set.
+- `_uninstall` is also called on plugin updates: it removes the layer and the virtual microphone, and `_main` puts them
+  back when `layer_registered` / `virtual_mic` are set.

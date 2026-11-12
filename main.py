@@ -5,12 +5,13 @@ import traceback
 
 import decky  # provided by Decky Loader
 
-from obscapture import artwork, flatpak, layer, obsconfig, system
+from obscapture import artwork, flatpak, layer, obsconfig, system, virtualmic
 
 SETTINGS = "settings.json"
 DEFAULT_SETTINGS = {
     "enabled": False,  # OBS_VKCAPTURE=1 goes into every game's launch options
     "applied": [],     # appids whose launch options the plugin changed (taken out again on disable)
+    "virtual_mic": False,  # a silent PipeWire microphone for when none is connected
 }
 FALLBACK_CANVAS = (1920, 1080)
 # setup steps in order; the frontend shows their names
@@ -39,6 +40,12 @@ class Plugin:
                 await asyncio.get_running_loop().run_in_executor(None, self._register_layer)
             except Exception as e:  # noqa: BLE001
                 decky.logger.error(f"could not re-register the layer: {e}")
+        # _uninstall (also run on updates) removes the microphone too
+        if self._settings().get("virtual_mic"):
+            try:
+                await asyncio.get_running_loop().run_in_executor(None, virtualmic.enable, self.home, self.env)
+            except Exception as e:  # noqa: BLE001
+                decky.logger.error(f"could not restore the virtual microphone: {e}")
         decky.logger.info("OBS Game Capture backend started")
 
     async def _unload(self):
@@ -49,6 +56,10 @@ class Plugin:
         # The flag left in launch options is harmless without the layer.
         try:
             layer.remove(decky.DECKY_USER_HOME, os.path.join(decky.DECKY_PLUGIN_RUNTIME_DIR, "vkcapture"))
+        except Exception as e:  # noqa: BLE001
+            decky.logger.error(f"uninstall: {e}")
+        try:
+            virtualmic.disable(decky.DECKY_USER_HOME, flatpak.clean_env(decky.DECKY_USER_HOME))
         except Exception as e:  # noqa: BLE001
             decky.logger.error(f"uninstall: {e}")
 
@@ -99,6 +110,7 @@ class Plugin:
             "layer": layer.status(self.home, self.layer_dest),
             "obs_configured": obsconfig.configured(self.home),
             "obs_running": system.obs_running(),
+            "virtual_mic_running": virtualmic.running(self.env),
             "icon": icon,
             "home": self.home,
         }
@@ -167,7 +179,7 @@ class Plugin:
             status = await asyncio.get_running_loop().run_in_executor(None, self._status_blocking)
             s = self._settings()
             return {"ok": True, **status, "enabled": s["enabled"], "applied": s["applied"],
-                    "setup": self.setup_state}
+                    "virtual_mic": s["virtual_mic"], "setup": self.setup_state}
         except Exception as e:  # noqa: BLE001
             return _err(e)
 
@@ -182,6 +194,15 @@ class Plugin:
         """The frontend changes launch options (only Steam can) and records here what it did."""
         try:
             self._save(enabled=bool(enabled), applied=sorted({int(a) for a in applied}))
+            return {"ok": True}
+        except Exception as e:  # noqa: BLE001
+            return _err(e)
+
+    async def set_virtual_mic(self, enabled: bool) -> dict:
+        try:
+            fn = virtualmic.enable if enabled else virtualmic.disable
+            await asyncio.get_running_loop().run_in_executor(None, fn, self.home, self.env)
+            self._save(virtual_mic=bool(enabled))
             return {"ok": True}
         except Exception as e:  # noqa: BLE001
             return _err(e)

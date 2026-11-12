@@ -37,10 +37,12 @@ export type State =
       layer: "plugin" | "system" | null;
       obs_configured: boolean;
       obs_running: boolean;
+      virtual_mic_running: boolean | null;
       icon: string;
       home: string;
       enabled: boolean;
       applied: number[];
+      virtual_mic: boolean;
       setup: SetupState;
     }
   | { ok: false; error: string };
@@ -55,6 +57,9 @@ export interface Artwork {
 export const getState = callable<[], State>("get_state");
 export const startSetup = callable<[], { ok: boolean }>("start_setup");
 export const saveGames = callable<[enabled: boolean, applied: number[]], { ok: boolean }>("save_games");
+export const setVirtualMic = callable<[enabled: boolean], { ok: true } | { ok: false; error: string }>(
+  "set_virtual_mic",
+);
 export const getArtwork = callable<[appid: number], { ok: true; images: Artwork[] } | { ok: false; error: string }>(
   "get_artwork",
 );
